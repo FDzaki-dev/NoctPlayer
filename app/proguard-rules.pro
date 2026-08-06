@@ -1,0 +1,2 @@
+-keep class com.noctplayer.app.data.local.db.entity.** { *; }
+-dontwarn org.checkerframework.**
