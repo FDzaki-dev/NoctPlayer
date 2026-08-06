@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.1.1] - 2026-08-06 — CI build fix
+### Fixed
+- `PlayerScreen.kt`: missing `import androidx.compose.ui.unit.dp` caused 8
+  "Unresolved reference: dp" compile errors, confirmed from CI run
+  `84287811225` (`app:compileReleaseKotlin` failure). Root cause: `dp` usages
+  were added incrementally while writing the gesture/controls overlay and the
+  import was never added — static brace/XML checks in Phase 1 didn't catch it
+  because they don't do symbol resolution. Swept the rest of the project for
+  the same class of gap (any `.dp`/`.sp` usage without its `unit` import) —
+  no other files affected.
+
 ## [0.1.0] - 2026-08-06 — Phase 1: Core Architecture
 ### Added
 - Project scaffold: Gradle Kotlin DSL, Compose, Room, Media3 ExoPlayer, Coil

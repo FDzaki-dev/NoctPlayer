@@ -53,7 +53,10 @@ Min/Target/Compile SDK: 26 / 34 / 34
 - [ ] Handle codec-unsupported / corrupt-file playback errors gracefully in PlayerScreen (partial: generic error state exists, not codec-specific)
 
 ## Crash Log History
-None yet — no builds run outside this environment (static generation only).
+- 2026-08-06 — CI run 84287811225: `app:compileReleaseKotlin` failed, 8x
+  "Unresolved reference: dp" in `PlayerScreen.kt` (lines 69,71,212,279,285,302).
+  Cause: missing `import androidx.compose.ui.unit.dp`. Fixed in v0.1.1; project-
+  wide swept for the same gap, none found elsewhere.
 
 ## Known Risks / Unverified Items
 - `Modifier.graphicsLayer(scaleX=, scaleY=)` import path used
