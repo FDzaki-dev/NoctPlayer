@@ -46,21 +46,28 @@ jobs:
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: set -euo pipefail; ./gradlew assembleRelease --stacktrace
 
-      - name: Verify APK signature
-        run: |
-          BUILD_TOOLS=$(ls $ANDROID_HOME/build-tools | sort -V | tail -1)
-          APK_PATH=$(find app/build/outputs/apk/release -name "*.apk" | head -1)
-          echo "APK: $APK_PATH"
-          $ANDROID_HOME/build-tools/$BUILD_TOOLS/apksigner verify --verbose "$APK_PATH" | tee verify.txt
-          sha256sum "$APK_PATH" | tee -a verify.txt
-          echo "## APK Verification" >> $GITHUB_STEP_SUMMARY
-          cat verify.txt >> $GITHUB_STEP_SUMMARY
-          echo "APK_PATH=$APK_PATH" >> $GITHUB_ENV
-
       - name: Read version name
         run: |
           VERSION=$(grep 'versionName' app/build.gradle.kts | head -1 | sed 's/[^0-9.]//g')
           echo "VERSION=$VERSION" >> $GITHUB_ENV
+
+      - name: Rename APK output
+        run: |
+          RAW_APK=$(find app/build/outputs/apk/release -name "*.apk" | head -1)
+          NEW_NAME="NoctPlayer-v${VERSION}-release.apk"
+          NEW_PATH="app/build/outputs/apk/release/$NEW_NAME"
+          mv "$RAW_APK" "$NEW_PATH"
+          echo "APK_PATH=$NEW_PATH" >> $GITHUB_ENV
+          echo "APK_NAME=$NEW_NAME" >> $GITHUB_ENV
+
+      - name: Verify APK signature
+        run: |
+          BUILD_TOOLS=$(ls $ANDROID_HOME/build-tools | sort -V | tail -1)
+          echo "APK: $APK_PATH"
+          $ANDROID_HOME/build-tools/$BUILD_TOOLS/apksigner verify --verbose "$APK_PATH" | tee verify.txt
+          sha256sum "$APK_PATH" | tee -a verify.txt
+          echo "## APK Verification ($APK_NAME)" >> $GITHUB_STEP_SUMMARY
+          cat verify.txt >> $GITHUB_STEP_SUMMARY
 
       - name: Publish GitHub Release with APK asset
         uses: softprops/action-gh-release@v2

@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.2] - 2026-08-06 — CI release asset naming
+### Changed
+- `.github/workflows/build.yml`: release APK asset renamed from generic
+  `app-release.apk` to `NoctPlayer-v${VERSION}-release.apk` before signature
+  verification and GitHub Release publish, so the Releases sidebar shows a
+  self-describing filename per build/version instead of the Gradle default.
+
 ## [0.1.1] - 2026-08-06 — CI build fix
 ### Fixed
 - `PlayerScreen.kt`: missing `import androidx.compose.ui.unit.dp` caused 8
