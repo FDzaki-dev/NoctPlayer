@@ -1,7 +1,7 @@
 # PROJECT_STATE.md — NoctPlayer
 
 ## Current State
-Version: 0.1.0 (Phase 1 — Core Architecture)
+Version: 0.3.0 (Phase 1 — Core Architecture, UI/UX polish pass)
 Package: com.noctplayer.app
 Min/Target/Compile SDK: 26 / 34 / 34
 
@@ -39,6 +39,44 @@ Min/Target/Compile SDK: 26 / 34 / 34
    26 supports adaptive icons natively. Placeholder mark (teal play-triangle
    on black) — swap the foreground vector for a real brand mark whenever
    ready; no build-breaking gap remains.
+
+## v0.3.0 — UI/UX Polish Pass (Atomic Change)
+Cross-cutting visual/interaction refresh across theme + library + player modules.
+Treated as one atomic batch (not split by module) because a partial apply would
+leave visually inconsistent screens (e.g. new type scale in Library but not
+Player). Files touched: 7 (Color.kt, Type.kt, Theme.kt, LibraryScreen.kt,
+LibraryViewModel.kt, PlayerScreen.kt, PlayerViewModel.kt) + 1 new
+(ui/components/Shimmer.kt). Confidence: 90% (static-analysis only, no
+device/emulator — see Scope of Guarantee).
+- **Theme**: expanded color roles (secondary, outline, surfaceContainer tiers,
+  progress-track, scrim colors) and full Material3 type scale (headline/title/
+  body/label at all sizes). `NoctPlayerTheme` now forces light (white) system
+  status-bar icons via `WindowInsetsController`, matching the AMOLED-black-only
+  design (previously relied on default/light-icon heuristics).
+- **Library screen**: animated search field (expand/collapse instead of hard
+  toggle), item-count subtitle in top bar, sort-menu selection dot, redesigned
+  empty state (icon + two-line copy + tonal CTA button), skeleton-grid loading
+  state (`LibraryGridSkeleton`, new shared `Shimmer.kt`) replacing the bare
+  center spinner, grid cells now show a **continue-watching progress bar**
+  (bottom of thumbnail, teal accent) sourced from `WatchProgressEntity`, plus
+  a bottom gradient scrim (was flat black chip) and a press-scale animation.
+- **Player screen**: control overlay now cross-fades in/out (`AnimatedVisibility`
+  + fade) instead of an instant show/hide cut; top/bottom bars use gradient
+  scrims instead of flat 50%-alpha black bands; gesture hint bubble now shows
+  an icon (rewind/forward/brightness/volume) alongside the value instead of
+  text only; favorite icon has a spring-scale pop on toggle and tints teal
+  when active; slider and speed label recolored to the accent when non-default;
+  speed picker dialog restyled to the dark theme (was default light-ish
+  `AlertDialog` colors) with a highlighted current-speed row.
+- **Bug fix found during polish**: `PlayerViewModel.load()` never initialized
+  `isFavorite` from `repository.isFavorite(id)`, so the favorite icon always
+  opened as unfilled even for already-favorited videos. Fixed by reading the
+  flow once (`.first()`) on load.
+- **New AI assumption**: continue-watching progress bar is hidden once a video
+  is marked finished (`WatchProgressEntity.isFinished`) or has no duration yet
+  (SAF items before first playback) — same "unknown" cases `formatDuration`
+  already treats as `--:--`. Revisit if a "recently finished" indicator is
+  wanted later.
 
 ## Roadmap (not yet implemented)
 - [ ] Subtitle rendering: SRT/ASS/SSA via Media3 subtitle support, delay + style controls

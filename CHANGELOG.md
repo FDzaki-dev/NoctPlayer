@@ -1,5 +1,43 @@
 # Changelog
 
+## [0.3.0] - 2026-08-07 — UI/UX polish pass
+### Added
+- `ui/components/Shimmer.kt`: `ShimmerBlock` + `LibraryGridSkeleton` skeleton
+  loading placeholders
+- Continue-watching progress bar on library grid cells, sourced from
+  `WatchProgressEntity` via a new `LibraryGridItem` wrapper in
+  `LibraryViewModel`
+- Expanded theme: secondary/outline/surfaceContainer color roles, full
+  Material3 type scale, forced light system status-bar icons
+
+### Changed
+- `LibraryScreen.kt`: animated search field, item-count subtitle, sort-menu
+  selection indicator, redesigned empty state, skeleton grid replaces bare
+  spinner, grid cells get bottom gradient scrim + press-scale animation
+- `PlayerScreen.kt`: controls overlay cross-fades instead of hard cut,
+  gradient scrims replace flat-alpha bars, gesture hint bubble now shows an
+  icon, favorite icon has a spring-scale pop, slider/speed label accent-tinted
+  when active, speed picker dialog restyled to dark theme
+- `LibraryViewModel.kt`: `uiState.items` is now `List<LibraryGridItem>`
+  (media + progress fraction) instead of `List<MediaItemEntity>` — combines
+  `observeRecentlyPlayed()` via a chained 5-arg + 2-arg `combine()` to avoid
+  kotlinx.coroutines' unsafe vararg `combine` overload for 6+ flows
+
+### Fixed
+- `PlayerViewModel.load()`: favorite icon always opened unfilled even for
+  already-favorited videos, because `isFavorite` was never read from
+  `repository.isFavorite(id)` on load. Now reads it once via `.first()`.
+
+### Impact Report
+- Files touched: 8 (7 modified: Color.kt, Type.kt, Theme.kt, LibraryScreen.kt,
+  LibraryViewModel.kt, PlayerScreen.kt, PlayerViewModel.kt; 1 new: Shimmer.kt)
+- Treated as one atomic batch spanning theme + library + player modules —
+  justified in PROJECT_STATE.md (partial apply would be visually inconsistent)
+- Confidence: 90% — internally consistent, symbol/import-checked; no
+  device/emulator available to confirm gradient/animation rendering or
+  `combine()` chain behavior at runtime (first real check is CI or Android
+  Studio)
+
 ## [0.2.0] - 2026-08-06 — Reliable video detection (dual-source scanning)
 ### Added
 - `SafFolderScanner`: user-added SAF folder trees scanned directly via

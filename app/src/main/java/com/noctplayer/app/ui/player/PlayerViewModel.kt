@@ -6,6 +6,7 @@ import com.noctplayer.app.data.repository.MediaRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 data class PlayerUiState(
@@ -34,10 +35,12 @@ class PlayerViewModel(private val repository: MediaRepository) : ViewModel() {
                     _uiState.value = _uiState.value.copy(errorMessage = "File not found or was moved/deleted")
                     return@launch
                 }
+                val favorite = repository.isFavorite(mediaId).first()
                 _uiState.value = PlayerUiState(
                     title = item.displayName,
                     uri = item.uriString,
                     resumePositionMs = progress?.positionMs ?: 0L,
+                    isFavorite = favorite,
                     isReady = true
                 )
             } catch (e: Exception) {

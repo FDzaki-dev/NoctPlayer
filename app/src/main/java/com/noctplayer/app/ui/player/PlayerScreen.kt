@@ -2,21 +2,30 @@ package com.noctplayer.app.ui.player
 
 import android.app.Activity
 import android.content.pm.ActivityInfo
-import android.provider.Settings
 import android.view.ViewGroup
 import android.view.WindowManager
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
@@ -29,8 +38,8 @@ import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
+import com.noctplayer.app.ui.theme.NoctAccent
 import kotlinx.coroutines.delay
-import kotlin.math.abs
 import kotlin.math.roundToInt
 
 private const val SEEK_STEP_MS = 10_000L
@@ -66,11 +75,11 @@ fun PlayerScreen(
     if (state.errorMessage != null) {
         Box(Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Icon(Icons.Default.ErrorOutline, contentDescription = null, tint = Color.White)
+                Icon(Icons.Default.ErrorOutline, contentDescription = null, tint = Color.White, modifier = Modifier.size(40.dp))
                 Spacer(Modifier.height(8.dp))
                 Text(state.errorMessage ?: "Playback error", color = Color.White)
                 Spacer(Modifier.height(16.dp))
-                TextButton(onClick = onBack) { Text("Go back") }
+                TextButton(onClick = onBack) { Text("Go back", color = NoctAccent) }
             }
         }
         return
@@ -78,7 +87,7 @@ fun PlayerScreen(
 
     if (!state.isReady) {
         Box(Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator(color = Color.White)
+            CircularProgressIndicator(color = NoctAccent)
         }
         return
     }
@@ -113,7 +122,8 @@ fun PlayerScreen(
     var isPlaying by remember { mutableStateOf(true) }
     var speed by remember { mutableStateOf(1f) }
     var speedMenuOpen by remember { mutableStateOf(false) }
-    var gestureHint by remember { mutableStateOf<String?>(null) }
+    var isFavorite by remember { mutableStateOf(state.isFavorite) }
+    var gestureHint by remember { mutableStateOf<GestureHint?>(null) }
     var zoom by remember { mutableStateOf(1f) }
 
     val audioManager = remember { context.getSystemService(android.content.Context.AUDIO_SERVICE) as android.media.AudioManager }
@@ -152,10 +162,10 @@ fun PlayerScreen(
                         val width = size.width
                         if (offset.x < width / 2f) {
                             exoPlayer.seekTo((exoPlayer.currentPosition - SEEK_STEP_MS).coerceAtLeast(0))
-                            gestureHint = "-10s"
+                            gestureHint = GestureHint(Icons.Default.FastRewind, "10 sec")
                         } else {
                             exoPlayer.seekTo(exoPlayer.currentPosition + SEEK_STEP_MS)
-                            gestureHint = "+10s"
+                            gestureHint = GestureHint(Icons.Default.FastForward, "10 sec")
                         }
                     }
                 )
@@ -177,13 +187,16 @@ fun PlayerScreen(
                         }
                         val newValue = (current - dragAmount / 1000f).coerceIn(0.02f, 1f)
                         window?.attributes = window?.attributes?.apply { screenBrightness = newValue }
-                        gestureHint = "Brightness ${(newValue * 100).roundToInt()}%"
+                        gestureHint = GestureHint(Icons.Default.BrightnessMedium, "${(newValue * 100).roundToInt()}%")
                     } else {
                         val current = audioManager.getStreamVolume(android.media.AudioManager.STREAM_MUSIC)
                         val delta = (-dragAmount / 1000f * maxVolume).roundToInt()
                         val newVol = (current + delta).coerceIn(0, maxVolume)
                         audioManager.setStreamVolume(android.media.AudioManager.STREAM_MUSIC, newVol, 0)
-                        gestureHint = "Volume ${(newVol * 100 / maxVolume)}%"
+                        gestureHint = GestureHint(
+                            if (newVol == 0) Icons.Default.VolumeOff else Icons.Default.VolumeUp,
+                            "${(newVol * 100 / maxVolume)}%"
+                        )
                     }
                 }
             }
@@ -204,29 +217,49 @@ fun PlayerScreen(
             },
             modifier = Modifier
                 .fillMaxSize()
-                .graphicsLayerScale(zoom)
+                .graphicsLayer(scaleX = zoom, scaleY = zoom)
         )
 
-        gestureHint?.let { hint ->
-            Box(Modifier.align(Alignment.Center)) {
-                Surface(color = Color.Black.copy(alpha = 0.6f), shape = MaterialTheme.shapes.medium) {
-                    Text(hint, color = Color.White, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+        AnimatedVisibility(
+            visible = gestureHint != null,
+            enter = fadeIn(tween(100)),
+            exit = fadeOut(tween(200)),
+            modifier = Modifier.align(Alignment.Center)
+        ) {
+            gestureHint?.let { hint ->
+                Surface(
+                    color = Color.Black.copy(alpha = 0.65f),
+                    shape = RoundedCornerShape(14.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(horizontal = 18.dp, vertical = 12.dp)
+                    ) {
+                        Icon(hint.icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(22.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(hint.label, color = Color.White, style = MaterialTheme.typography.titleSmall)
+                    }
                 }
             }
         }
 
-        if (controlsVisible) {
+        AnimatedVisibility(
+            visible = controlsVisible,
+            enter = fadeIn(tween(150)),
+            exit = fadeOut(tween(200)),
+            modifier = Modifier.fillMaxSize()
+        ) {
             PlayerControlsOverlay(
                 title = state.title,
                 isPlaying = isPlaying,
-                isFavorite = state.isFavorite,
+                isFavorite = isFavorite,
                 speed = speed,
                 exoPlayer = exoPlayer,
                 onBack = onBack,
                 onPlayPause = {
                     if (exoPlayer.isPlaying) exoPlayer.pause() else exoPlayer.play()
                 },
-                onFavorite = viewModel::toggleFavorite,
+                onFavorite = { isFavorite = !isFavorite; viewModel.toggleFavorite() },
                 onSpeedClick = { speedMenuOpen = true }
             )
         }
@@ -245,9 +278,7 @@ fun PlayerScreen(
     }
 }
 
-private fun Modifier.graphicsLayerScale(scale: Float): Modifier = this.then(
-    Modifier.graphicsLayer(scaleX = scale, scaleY = scale)
-)
+private data class GestureHint(val icon: androidx.compose.ui.graphics.vector.ImageVector, val label: String)
 
 @Composable
 private fun PlayerControlsOverlay(
@@ -263,6 +294,11 @@ private fun PlayerControlsOverlay(
 ) {
     var position by remember { mutableStateOf(exoPlayer.currentPosition) }
     val duration = exoPlayer.duration.coerceAtLeast(1)
+    val favoriteScale by animateFloatAsState(
+        targetValue = if (isFavorite) 1.15f else 1f,
+        animationSpec = spring(dampingRatio = 0.35f),
+        label = "favoriteScale"
+    )
 
     LaunchedEffect(exoPlayer) {
         while (true) {
@@ -272,52 +308,67 @@ private fun PlayerControlsOverlay(
     }
 
     Column(Modifier.fillMaxSize()) {
-        // Top bar
+        // Top bar with a gradient scrim so the title stays legible over any video content.
         Row(
             Modifier
                 .fillMaxWidth()
-                .background(Color.Black.copy(alpha = 0.5f))
-                .padding(horizontal = 8.dp, vertical = 4.dp),
+                .background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.7f), Color.Transparent)))
+                .padding(horizontal = 4.dp, vertical = 4.dp)
+                .padding(bottom = 24.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(onClick = onBack) {
                 Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color.White)
             }
-            Text(title, color = Color.White, maxLines = 1, modifier = Modifier.weight(1f).padding(start = 4.dp))
+            Text(
+                title,
+                color = Color.White,
+                maxLines = 1,
+                style = MaterialTheme.typography.titleSmall,
+                modifier = Modifier.weight(1f).padding(start = 4.dp)
+            )
             IconButton(onClick = onFavorite) {
                 Icon(
                     if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                     contentDescription = "Favorite",
-                    tint = Color.White
+                    tint = if (isFavorite) NoctAccent else Color.White,
+                    modifier = Modifier.scale(favoriteScale)
                 )
             }
         }
 
         Spacer(Modifier.weight(1f))
 
-        // Bottom bar
+        // Bottom bar with a gradient scrim, mirroring the top bar.
         Column(
             Modifier
                 .fillMaxWidth()
-                .background(Color.Black.copy(alpha = 0.5f))
-                .padding(12.dp)
+                .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.75f))))
+                .padding(top = 20.dp)
+                .padding(horizontal = 12.dp, vertical = 8.dp)
         ) {
             Slider(
                 value = position.toFloat().coerceIn(0f, duration.toFloat()),
                 onValueChange = { exoPlayer.seekTo(it.toLong()) },
-                valueRange = 0f..duration.toFloat()
+                valueRange = 0f..duration.toFloat(),
+                colors = SliderDefaults.colors(
+                    thumbColor = NoctAccent,
+                    activeTrackColor = NoctAccent,
+                    inactiveTrackColor = Color.White.copy(alpha = 0.25f)
+                )
             )
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(formatTime(position), color = Color.White, style = MaterialTheme.typography.labelSmall)
                 Spacer(Modifier.weight(1f))
                 TextButton(onClick = onSpeedClick) {
-                    Text("${speed}x", color = Color.White)
+                    Text("${speed}x", color = if (speed != 1f) NoctAccent else Color.White)
                 }
                 IconButton(onClick = onPlayPause) {
                     Icon(
                         if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
                         contentDescription = "Play/Pause",
-                        tint = Color.White
+                        tint = Color.White,
+                        modifier = Modifier.size(30.dp)
                     )
                 }
                 Text(formatTime(duration), color = Color.White, style = MaterialTheme.typography.labelSmall)
@@ -330,17 +381,24 @@ private fun PlayerControlsOverlay(
 private fun SpeedPickerDialog(current: Float, onDismiss: () -> Unit, onSelect: (Float) -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
+        containerColor = MaterialTheme.colorScheme.surfaceContainer,
+        titleContentColor = MaterialTheme.colorScheme.onSurface,
+        textContentColor = MaterialTheme.colorScheme.onSurface,
         title = { Text("Playback speed") },
         text = {
             Column {
                 SPEED_OPTIONS.forEach { option ->
+                    val selected = option == current
                     TextButton(onClick = { onSelect(option) }) {
-                        Text("${option}x" + if (option == current) "  ✓" else "")
+                        Text(
+                            "${option}x" + if (selected) "  ✓" else "",
+                            color = if (selected) NoctAccent else MaterialTheme.colorScheme.onSurface
+                        )
                     }
                 }
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("Close") } }
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Close", color = NoctAccent) } }
     )
 }
 

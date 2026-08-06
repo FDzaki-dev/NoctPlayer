@@ -4,8 +4,17 @@ import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -13,6 +22,7 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CreateNewFolder
+import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material3.*
@@ -20,13 +30,17 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
-import com.noctplayer.app.data.local.db.entity.MediaItemEntity
+import com.noctplayer.app.ui.components.LibraryGridSkeleton
+import com.noctplayer.app.ui.theme.NoctAccent
+import com.noctplayer.app.ui.theme.NoctProgressTrack
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -53,49 +67,88 @@ fun LibraryScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("Library") },
-                actions = {
-                    IconButton(onClick = { folderPicker.launch(null) }) {
-                        Icon(Icons.Default.CreateNewFolder, contentDescription = "Add folder to scan")
-                    }
-                    IconButton(onClick = { searchOpen = !searchOpen }) {
-                        Icon(Icons.Default.Search, contentDescription = "Search")
-                    }
-                    Box {
-                        IconButton(onClick = { sortMenuOpen = true }) {
-                            Icon(Icons.Default.Sort, contentDescription = "Sort")
-                        }
-                        DropdownMenu(expanded = sortMenuOpen, onDismissRequest = { sortMenuOpen = false }) {
-                            SortOrder.entries.forEach { order ->
-                                DropdownMenuItem(
-                                    text = {
-                                        Text(
-                                            order.name.replace('_', ' ').lowercase()
-                                                .replaceFirstChar { it.uppercase() }
-                                        )
-                                    },
-                                    onClick = { viewModel.setSortOrder(order); sortMenuOpen = false }
+            Column {
+                TopAppBar(
+                    title = {
+                        Column {
+                            Text("Library", style = MaterialTheme.typography.titleLarge)
+                            if (state.items.isNotEmpty()) {
+                                Text(
+                                    "${state.items.size} video${if (state.items.size == 1) "" else "s"}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         }
-                    }
+                    },
+                    actions = {
+                        IconButton(onClick = { folderPicker.launch(null) }) {
+                            Icon(Icons.Default.CreateNewFolder, contentDescription = "Add folder to scan")
+                        }
+                        IconButton(onClick = { searchOpen = !searchOpen }) {
+                            Icon(
+                                Icons.Default.Search,
+                                contentDescription = "Search",
+                                tint = if (searchOpen) NoctAccent else LocalContentColor.current
+                            )
+                        }
+                        Box {
+                            IconButton(onClick = { sortMenuOpen = true }) {
+                                Icon(Icons.Default.Sort, contentDescription = "Sort")
+                            }
+                            DropdownMenu(expanded = sortMenuOpen, onDismissRequest = { sortMenuOpen = false }) {
+                                SortOrder.entries.forEach { order ->
+                                    DropdownMenuItem(
+                                        text = {
+                                            Text(
+                                                order.name.replace('_', ' ').lowercase()
+                                                    .replaceFirstChar { it.uppercase() }
+                                            )
+                                        },
+                                        onClick = { viewModel.setSortOrder(order); sortMenuOpen = false },
+                                        trailingIcon = {
+                                            if (order == state.sortOrder) {
+                                                Box(
+                                                    Modifier
+                                                        .size(6.dp)
+                                                        .clip(RoundedCornerShape(50))
+                                                        .background(NoctAccent)
+                                                )
+                                            }
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.background
+                    )
+                )
+                AnimatedVisibility(
+                    visible = searchOpen,
+                    enter = fadeIn(tween(150)) + expandVertically(tween(200)),
+                    exit = fadeOut(tween(120)) + shrinkVertically(tween(180))
+                ) {
+                    OutlinedTextField(
+                        value = state.query,
+                        onValueChange = viewModel::setQuery,
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+                        placeholder = { Text("Search library") },
+                        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                        singleLine = true,
+                        shape = RoundedCornerShape(14.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = NoctAccent,
+                            cursorColor = NoctAccent
+                        )
+                    )
                 }
-            )
+            }
         }
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
-            if (searchOpen) {
-                OutlinedTextField(
-                    value = state.query,
-                    onValueChange = viewModel::setQuery,
-                    modifier = Modifier.fillMaxWidth().padding(12.dp),
-                    placeholder = { Text("Search library") },
-                    singleLine = true
-                )
-            }
-
-            if (state.safFolderCount > 0) {
+            AnimatedVisibility(visible = state.safFolderCount > 0) {
                 Text(
                     "${state.safFolderCount} extra folder(s) added — scanned directly, bypassing system indexing",
                     style = MaterialTheme.typography.labelSmall,
@@ -106,19 +159,33 @@ fun LibraryScreen(
 
             when {
                 state.isScanning && state.items.isEmpty() -> {
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator()
-                    }
+                    LibraryGridSkeleton(modifier = Modifier.fillMaxSize())
                 }
                 state.items.isEmpty() -> {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(
+                                Icons.Default.Movie,
+                                contentDescription = null,
+                                modifier = Modifier.size(56.dp),
+                                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.25f)
+                            )
+                            Spacer(Modifier.height(12.dp))
                             Text(
                                 "No videos found on this device",
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                             )
-                            Spacer(Modifier.height(8.dp))
-                            TextButton(onClick = { folderPicker.launch(null) }) {
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                "Videos will appear here automatically, or add a folder manually",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f)
+                            )
+                            Spacer(Modifier.height(16.dp))
+                            FilledTonalButton(onClick = { folderPicker.launch(null) }) {
+                                Icon(Icons.Default.CreateNewFolder, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(8.dp))
                                 Text("Add a folder to scan")
                             }
                         }
@@ -131,8 +198,11 @@ fun LibraryScreen(
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        items(state.items, key = { it.id }) { item ->
-                            VideoGridCell(item, onClick = { onOpenVideo(item.id) })
+                        items(state.items, key = { it.media.id }) { gridItem ->
+                            VideoGridCell(
+                                item = gridItem,
+                                onClick = { onOpenVideo(gridItem.media.id) }
+                            )
                         }
                     }
                 }
@@ -142,11 +212,17 @@ fun LibraryScreen(
 }
 
 @Composable
-private fun VideoGridCell(item: MediaItemEntity, onClick: () -> Unit) {
+private fun VideoGridCell(item: LibraryGridItem, onClick: () -> Unit) {
+    val media = item.media
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(if (isPressed) 0.96f else 1f, tween(120), label = "cellScale")
+
     Column(
         Modifier
+            .scale(scale)
             .clip(RoundedCornerShape(10.dp))
-            .clickable(onClick = onClick)
+            .clickable(interactionSource = interactionSource, indication = null, onClick = onClick)
     ) {
         Box(
             Modifier
@@ -156,24 +232,43 @@ private fun VideoGridCell(item: MediaItemEntity, onClick: () -> Unit) {
                 .clip(RoundedCornerShape(10.dp))
         ) {
             AsyncImage(
-                model = item.uriString,
-                contentDescription = item.displayName,
+                model = media.uriString,
+                contentDescription = media.displayName,
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop
             )
+            // Bottom scrim so the duration label and progress bar stay legible over any thumbnail.
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(36.dp)
+                    .align(Alignment.BottomCenter)
+                    .background(
+                        Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.55f)))
+                    )
+            )
             Text(
-                text = formatDuration(item.durationMs),
+                text = formatDuration(media.durationMs),
                 color = Color.White,
                 style = MaterialTheme.typography.labelSmall,
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
-                    .padding(4.dp)
-                    .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(4.dp))
-                    .padding(horizontal = 4.dp, vertical = 2.dp)
+                    .padding(6.dp)
             )
+            item.progressFraction?.let { fraction ->
+                LinearProgressIndicator(
+                    progress = { fraction },
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .fillMaxWidth()
+                        .height(3.dp),
+                    color = NoctAccent,
+                    trackColor = NoctProgressTrack
+                )
+            }
         }
         Text(
-            text = item.displayName,
+            text = media.displayName,
             style = MaterialTheme.typography.bodyMedium,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,

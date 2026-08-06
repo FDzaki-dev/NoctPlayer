@@ -26,6 +26,7 @@ app/src/main/java/com/noctplayer/app/data/repository/MediaRepository.kt
 app/src/main/java/com/noctplayer/app/data/scanner/MediaStoreScanner.kt
 app/src/main/java/com/noctplayer/app/data/scanner/SafFolderScanner.kt
 app/src/main/java/com/noctplayer/app/data/scanner/SupportedFormats.kt
+app/src/main/java/com/noctplayer/app/ui/components/Shimmer.kt
 app/src/main/java/com/noctplayer/app/ui/library/LibraryScreen.kt
 app/src/main/java/com/noctplayer/app/ui/library/LibraryViewModel.kt
 app/src/main/java/com/noctplayer/app/ui/navigation/NavGraph.kt
