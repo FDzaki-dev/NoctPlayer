@@ -1,5 +1,9 @@
 package com.noctplayer.app.ui.library
 
+import android.content.Intent
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -8,6 +12,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CreateNewFolder
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material3.*
@@ -17,6 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
@@ -26,17 +32,33 @@ import com.noctplayer.app.data.local.db.entity.MediaItemEntity
 @Composable
 fun LibraryScreen(
     viewModel: LibraryViewModel,
-    onOpenVideo: (Long) -> Unit
+    onOpenVideo: (String) -> Unit
 ) {
+    val context = LocalContext.current
     val state by viewModel.uiState.collectAsState()
     var sortMenuOpen by remember { mutableStateOf(false) }
     var searchOpen by remember { mutableStateOf(false) }
+
+    val folderPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocumentTree()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            context.contentResolver.takePersistableUriPermission(
+                uri,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION
+            )
+            viewModel.addSafFolder(uri.toString())
+        }
+    }
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("Library") },
                 actions = {
+                    IconButton(onClick = { folderPicker.launch(null) }) {
+                        Icon(Icons.Default.CreateNewFolder, contentDescription = "Add folder to scan")
+                    }
                     IconButton(onClick = { searchOpen = !searchOpen }) {
                         Icon(Icons.Default.Search, contentDescription = "Search")
                     }
@@ -73,6 +95,15 @@ fun LibraryScreen(
                 )
             }
 
+            if (state.safFolderCount > 0) {
+                Text(
+                    "${state.safFolderCount} extra folder(s) added — scanned directly, bypassing system indexing",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+                )
+            }
+
             when {
                 state.isScanning && state.items.isEmpty() -> {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -81,10 +112,16 @@ fun LibraryScreen(
                 }
                 state.items.isEmpty() -> {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text(
-                            "No videos found on this device",
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                        )
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                "No videos found on this device",
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                            )
+                            Spacer(Modifier.height(8.dp))
+                            TextButton(onClick = { folderPicker.launch(null) }) {
+                                Text("Add a folder to scan")
+                            }
+                        }
                     }
                 }
                 else -> {
@@ -94,8 +131,8 @@ fun LibraryScreen(
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        items(state.items, key = { it.mediaStoreId }) { item ->
-                            VideoGridCell(item, onClick = { onOpenVideo(item.mediaStoreId) })
+                        items(state.items, key = { it.id }) { item ->
+                            VideoGridCell(item, onClick = { onOpenVideo(item.id) })
                         }
                     }
                 }
@@ -146,6 +183,7 @@ private fun VideoGridCell(item: MediaItemEntity, onClick: () -> Unit) {
 }
 
 private fun formatDuration(ms: Long): String {
+    if (ms <= 0L) return "--:--" // SAF-sourced items: duration unknown until first playback
     val totalSec = ms / 1000
     val h = totalSec / 3600
     val m = (totalSec % 3600) / 60

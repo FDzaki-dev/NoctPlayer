@@ -22,14 +22,14 @@ class PlayerViewModel(private val repository: MediaRepository) : ViewModel() {
     private val _uiState = MutableStateFlow(PlayerUiState())
     val uiState: StateFlow<PlayerUiState> = _uiState.asStateFlow()
 
-    private var currentId: Long = -1L
+    private var currentId: String = ""
 
-    fun load(mediaStoreId: Long) {
-        currentId = mediaStoreId
+    fun load(mediaId: String) {
+        currentId = mediaId
         viewModelScope.launch {
             try {
-                val item = repository.getMediaItem(mediaStoreId)
-                val progress = repository.getProgress(mediaStoreId)
+                val item = repository.getMediaItem(mediaId)
+                val progress = repository.getProgress(mediaId)
                 if (item == null) {
                     _uiState.value = _uiState.value.copy(errorMessage = "File not found or was moved/deleted")
                     return@launch
@@ -47,14 +47,14 @@ class PlayerViewModel(private val repository: MediaRepository) : ViewModel() {
     }
 
     fun savePosition(positionMs: Long, durationMs: Long) {
-        if (currentId < 0) return
+        if (currentId.isEmpty()) return
         viewModelScope.launch {
             repository.saveProgress(currentId, positionMs, durationMs)
         }
     }
 
     fun toggleFavorite() {
-        if (currentId < 0) return
+        if (currentId.isEmpty()) return
         viewModelScope.launch {
             repository.toggleFavorite(currentId, _uiState.value.isFavorite)
             _uiState.value = _uiState.value.copy(isFavorite = !_uiState.value.isFavorite)

@@ -1,5 +1,47 @@
 # Changelog
 
+## [0.2.0] - 2026-08-06 — Reliable video detection (dual-source scanning)
+### Added
+- `SafFolderScanner`: user-added SAF folder trees scanned directly via
+  DocumentsProvider, bypassing MediaStore indexing entirely — guaranteed
+  fallback for videos the system hasn't scanned or misclassifies
+- `SafFolderPrefs`: persists which folders the user added (with persisted
+  URI permission) across app restarts
+- "Add folder" button in Library top bar + empty-state prompt, using
+  `ActivityResultContracts.OpenDocumentTree`
+- `SupportedFormats.kt`: single source of truth for supported extensions
+  (mp4, mkv, avi, mov, webm, flv, ts, m4v, 3gp, mpg) shared by both scanners
+
+### Changed (breaking, atomic)
+- `MediaStoreScanner` now queries `MediaStore.Files` filtered by filename
+  extension instead of `MediaStore.Video.Media`. Root issue: some OEM
+  MediaProviders (verified concern on this project's reference device,
+  Infinix XOS) fail to classify `.mkv`/`.ts`/`.flv`/`.avi` as
+  `MEDIA_TYPE_VIDEO`, making them invisible to a `Video.Media`-only query
+  even though the file plays fine. Extension-based `Files` query catches
+  those misclassified rows; column lookups are now non-throwing with safe
+  defaults for older/incomplete provider schemas.
+- **Schema/ID scheme**: `MediaItemEntity` primary key changed from
+  `mediaStoreId: Long` to `id: String` (source-prefixed: `ms:<id>` /
+  `saf:<sha1>`), so MediaStore- and SAF-sourced items can coexist without
+  collision. Cascaded through `WatchProgressEntity`, `FavoriteEntity`,
+  `PlaylistItemEntity`, all DAOs, `MediaRepository`, `LibraryViewModel`,
+  `PlayerViewModel`, `PlayerScreen`, `NavGraph` (route arg now URL-encoded
+  String, not `NavType.LongType`), `MainActivity`. Applied as one atomic
+  batch — a partial apply would not compile.
+- Room DB bumped to version 2 with `fallbackToDestructiveMigration()` (no
+  shipped users on v1; replace with a real migration before public release)
+- Added `androidx.documentfile:documentfile:1.0.1` dependency
+
+### Impact Report
+- Files touched: 19 (14 modified, 5 new: `SafFolderScanner.kt`,
+  `SafFolderPrefs.kt`, `SupportedFormats.kt`, `Converters.kt`, this changelog)
+- Confidence: 80% — logic is internally consistent and statically verified
+  (brace/XML/YAML checks pass, `mediaStoreId` sweep clean), but the
+  `MediaStore.Files` column-availability behavior across OEM skins and the
+  DocumentFile tree-walk performance on large folders are both unverified
+  without a real device (see PROJECT_STATE.md risks)
+
 ## [0.1.2] - 2026-08-06 — CI release asset naming
 ### Changed
 - `.github/workflows/build.yml`: release APK asset renamed from generic

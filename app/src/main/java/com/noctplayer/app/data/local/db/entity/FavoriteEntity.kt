@@ -5,6 +5,6 @@ import androidx.room.PrimaryKey
 
 @Entity(tableName = "favorites")
 data class FavoriteEntity(
-    @PrimaryKey val mediaStoreId: Long,
+    @PrimaryKey val id: String,
     val addedAt: Long
 )

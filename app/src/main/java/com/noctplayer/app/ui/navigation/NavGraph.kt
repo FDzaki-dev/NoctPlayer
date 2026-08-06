@@ -1,9 +1,7 @@
 package com.noctplayer.app.ui.navigation
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -14,11 +12,13 @@ import com.noctplayer.app.ui.library.LibraryScreen
 import com.noctplayer.app.ui.library.LibraryViewModel
 import com.noctplayer.app.ui.player.PlayerScreen
 import com.noctplayer.app.ui.player.PlayerViewModel
+import java.net.URLDecoder
+import java.net.URLEncoder
 
 object Routes {
     const val LIBRARY = "library"
     const val PLAYER = "player/{mediaId}"
-    fun playerRoute(mediaId: Long) = "player/$mediaId"
+    fun playerRoute(mediaId: String) = "player/${URLEncoder.encode(mediaId, "UTF-8")}"
 }
 
 @Composable
@@ -35,13 +35,14 @@ fun NoctNavGraph(repository: MediaRepository) {
         }
         composable(
             route = Routes.PLAYER,
-            arguments = listOf(navArgument("mediaId") { type = NavType.LongType })
+            arguments = listOf(navArgument("mediaId") { type = NavType.StringType })
         ) { backStackEntry ->
-            val mediaId = backStackEntry.arguments?.getLong("mediaId") ?: -1L
+            val encoded = backStackEntry.arguments?.getString("mediaId") ?: ""
+            val mediaId = URLDecoder.decode(encoded, "UTF-8")
             val vm: PlayerViewModel = viewModel(factory = viewModelFactory { PlayerViewModel(repository) })
             PlayerScreen(
                 viewModel = vm,
-                mediaStoreId = mediaId,
+                mediaId = mediaId,
                 onBack = { navController.popBackStack() }
             )
         }

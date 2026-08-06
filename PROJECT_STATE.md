@@ -42,7 +42,11 @@ Min/Target/Compile SDK: 26 / 34 / 34
 
 ## Roadmap (not yet implemented)
 - [ ] Subtitle rendering: SRT/ASS/SSA via Media3 subtitle support, delay + style controls
-- [ ] Audio track selector + subtitle track selector UI (TrackSelectionOverride)
+      — `SubtitlePrefsRepository` (DataStore) and `TrackSelectionHelper` (audio/subtitle
+      track listing + selection + external-subtitle attach via SAF) are already written
+      and functional but **not yet wired into PlayerScreen** — next batch, not a stub.
+- [ ] Audio track selector + subtitle track selector UI (backing functions exist in
+      `TrackSelectionHelper.kt`; needs a bottom-sheet UI to call them)
 - [ ] LibVLC fallback engine + codec-failure auto-switch from ExoPlayer
 - [ ] Video info panel: codec, bitrate, fps, resolution, file size (MediaExtractor/MediaMetadataRetriever)
 - [ ] File operations: rename/delete/share from library grid (long-press menu)
@@ -59,6 +63,22 @@ Min/Target/Compile SDK: 26 / 34 / 34
   wide swept for the same gap, none found elsewhere.
 
 ## Known Risks / Unverified Items
+- **MediaStore.Files column availability across OEMs (v0.2.0 fix, unverified on
+  real hardware)**: extension-based query + non-throwing column lookups are a
+  defensive design, but the actual behavior on Infinix XOS / other OEM skins
+  hasn't been confirmed on-device yet. If videos still don't appear after this
+  update, the SAF "Add folder" fallback is the guaranteed path — ask the user
+  to add the folder manually and treat that as a strong diagnostic signal
+  (MediaStore path failing on their device specifically).
+- **SafFolderScanner tree walk**: recursive `DocumentFile.listFiles()` makes
+  one IPC round-trip per directory level; large folder trees (thousands of
+  files / deep nesting) may be slow. No pagination/depth-limit implemented
+  yet — acceptable for a user-added handful of folders, worth revisiting if
+  reports of slow "Add folder" scans come in.
+- **SAF duration/resolution unknown until first playback** (`durationMs = 0`,
+  shown as "--:--" in the grid) since DocumentFile doesn't expose media
+  metadata — only MediaStore does. A real fix would need MediaMetadataRetriever
+  per file at scan time, which is expensive for large folders; deferred.
 - `Modifier.graphicsLayer(scaleX=, scaleY=)` import path used
   (`androidx.compose.ui.graphics.graphicsLayer`) — verify resolves correctly
   against Compose BOM 2024.06.00 when opened in Android Studio; alternate
@@ -69,6 +89,9 @@ Min/Target/Compile SDK: 26 / 34 / 34
   locally instead of relying on CI.
 - Room `exportSchema = true` but no `schemas/` directory checked in yet —
   first local build will generate it; consider committing it in a later batch.
+- `TrackSelectionHelper.kt`'s `attachExternalSubtitle` and `SubtitlePrefsRepository`
+  are written but unused by any screen yet (Phase 2 in progress) — dead code
+  from the compiler's perspective until wired in, not a functional risk.
 
 ## Scope of Guarantee
 This delivery is static-analysis-only (import/symbol consistency, structural

@@ -10,9 +10,9 @@ data class PlaylistEntity(
     val createdAt: Long
 )
 
-@Entity(tableName = "playlist_items", primaryKeys = ["playlistId", "mediaStoreId"])
+@Entity(tableName = "playlist_items", primaryKeys = ["playlistId", "mediaItemId"])
 data class PlaylistItemEntity(
     val playlistId: Long,
-    val mediaStoreId: Long,
+    val mediaItemId: String,
     val orderIndex: Int
 )

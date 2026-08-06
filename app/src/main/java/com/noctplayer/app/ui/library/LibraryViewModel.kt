@@ -7,7 +7,6 @@ import com.noctplayer.app.data.repository.MediaRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -17,7 +16,8 @@ data class LibraryUiState(
     val items: List<MediaItemEntity> = emptyList(),
     val isScanning: Boolean = false,
     val sortOrder: SortOrder = SortOrder.DATE_ADDED,
-    val query: String = ""
+    val query: String = "",
+    val safFolderCount: Int = 0
 )
 
 class LibraryViewModel(private val repository: MediaRepository) : ViewModel() {
@@ -27,8 +27,8 @@ class LibraryViewModel(private val repository: MediaRepository) : ViewModel() {
     private val isScanning = MutableStateFlow(false)
 
     val uiState: StateFlow<LibraryUiState> = kotlinx.coroutines.flow.combine(
-        repository.observeLibrary(), sortOrder, query, isScanning
-    ) { items, sort, q, scanning ->
+        repository.observeLibrary(), sortOrder, query, isScanning, repository.observeSafFolders()
+    ) { items, sort, q, scanning, folders ->
         val filtered = if (q.isBlank()) items else items.filter {
             it.displayName.contains(q, ignoreCase = true)
         }
@@ -38,7 +38,7 @@ class LibraryViewModel(private val repository: MediaRepository) : ViewModel() {
             SortOrder.DURATION -> filtered.sortedByDescending { it.durationMs }
             SortOrder.SIZE -> filtered.sortedByDescending { it.sizeBytes }
         }
-        LibraryUiState(sorted, scanning, sort, q)
+        LibraryUiState(sorted, scanning, sort, q, folders.size)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), LibraryUiState())
 
     init {
@@ -59,7 +59,18 @@ class LibraryViewModel(private val repository: MediaRepository) : ViewModel() {
     fun setSortOrder(order: SortOrder) { sortOrder.value = order }
     fun setQuery(q: String) { query.value = q }
 
-    fun deleteItem(id: Long) {
+    fun addSafFolder(uriString: String) {
+        viewModelScope.launch {
+            isScanning.value = true
+            try {
+                repository.addSafFolder(uriString)
+            } finally {
+                isScanning.value = false
+            }
+        }
+    }
+
+    fun deleteItem(id: String) {
         viewModelScope.launch { repository.deleteFromLibrary(id) }
     }
 }

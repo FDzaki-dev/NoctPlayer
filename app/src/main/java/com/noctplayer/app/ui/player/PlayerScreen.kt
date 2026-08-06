@@ -39,7 +39,7 @@ private val SPEED_OPTIONS = listOf(0.25f, 0.5f, 0.75f, 1f, 1.25f, 1.5f, 1.75f, 2
 @Composable
 fun PlayerScreen(
     viewModel: PlayerViewModel,
-    mediaStoreId: Long,
+    mediaId: String,
     onBack: () -> Unit
 ) {
     val context = LocalContext.current
@@ -47,7 +47,7 @@ fun PlayerScreen(
     val view = LocalView.current
     val state by viewModel.uiState.collectAsState()
 
-    LaunchedEffect(mediaStoreId) { viewModel.load(mediaStoreId) }
+    LaunchedEffect(mediaId) { viewModel.load(mediaId) }
 
     // Force landscape + immersive fullscreen while this screen is active.
     DisposableEffect(Unit) {
